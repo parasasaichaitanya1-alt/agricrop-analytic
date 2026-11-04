@@ -1,0 +1,1545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgriCrop Analytics - User-Defined Yield & Crop Intelligence</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .tab-active {
+            border-bottom: 2px solid #059669;
+            color: #059669;
+            font-weight: 700;
+            background-color: rgba(240, 253, 244, 0.6);
+        }
+        /* Custom scrollbar for dense data tables */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-slate-100/90 text-slate-800 font-sans min-h-screen flex flex-col antialiased">
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed top-4 right-4 z-[9999] flex flex-col gap-2 max-w-sm pointer-events-none"></div>
+
+    <!-- Top Navigation Header -->
+    <header class="bg-emerald-950 text-white shadow-xl sticky top-0 z-40 border-b border-emerald-800/60">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="p-2 bg-emerald-800/60 rounded-xl border border-emerald-600/40 shadow-inner">
+                    <span class="text-2xl leading-none">🌾</span>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-lg sm:text-xl font-bold tracking-tight">AgriCrop Analytics Platform</h1>
+                        <span id="dataModeBadge" class="text-[10px] font-mono tracking-wider font-semibold uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                            Preset Mode
+                        </span>
+                    </div>
+                    <p class="text-xs text-emerald-300/80">User-Defined Ingestion, Agricultural Yield Modelling & Scenario Studio</p>
+                </div>
+            </div>
+
+            <!-- Header Quick Actions -->
+            <div class="flex items-center flex-wrap gap-2 text-xs">
+                <button onclick="downloadCSVExport()" class="bg-emerald-700/80 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-semibold transition border border-emerald-500/40 flex items-center gap-1.5 shadow-sm active:scale-95">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    <span>Export Filtered CSV</span>
+                </button>
+                <button onclick="downloadSampleTemplate()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg font-medium transition border border-slate-700 flex items-center gap-1.5 active:scale-95">
+                    <span>📄 Sample CSV</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full flex-1 space-y-6">
+
+        <!-- Ingestion & Simulation Master Bar -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            <!-- Left: Source Selection & Custom Actions -->
+            <section class="lg:col-span-5 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between space-y-3">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-emerald-700 font-bold text-sm flex items-center gap-1.5">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z"/></svg>
+                            Data Source Ingestion Mode
+                        </span>
+                    </div>
+                    <span id="recordSourceCount" class="text-xs font-mono font-medium text-slate-500">0 records</span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Preset Baselines</label>
+                        <select id="presetSelect" onchange="switchDataSourcePreset(this.value)" class="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-2 font-medium text-slate-700 focus:ring-2 focus:ring-emerald-500 transition">
+                            <option value="global">Global Multi-Crop (2014–2024)</option>
+                            <option value="north_america">North America Corn Belt</option>
+                            <option value="indo_gangetic">Indo-Gangetic Basin</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Workspace Mode</label>
+                        <div class="flex rounded-lg bg-slate-100 p-1 border border-slate-200">
+                            <button id="btnModePreset" onclick="setOperationalMode('preset')" class="flex-1 py-1 text-xs font-bold rounded-md bg-white shadow-sm text-emerald-800 transition">Preset</button>
+                            <button id="btnModeCustom" onclick="setOperationalMode('custom')" class="flex-1 py-1 text-xs font-semibold rounded-md text-slate-600 hover:text-slate-900 transition">User-Defined</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CSV Upload & Controls -->
+                <div class="pt-1 flex flex-wrap items-center justify-between gap-2">
+                    <label class="cursor-pointer bg-emerald-50 hover:bg-emerald-100/80 text-emerald-800 text-xs font-bold px-3 py-2 rounded-lg border border-emerald-300/80 flex items-center gap-1.5 transition">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                        <span>Upload Custom CSV</span>
+                        <input type="file" id="csvFileInput" accept=".csv,text/csv" class="hidden" onchange="handleFileUpload(event)">
+                    </label>
+
+                    <div class="flex items-center gap-1.5">
+                        <button onclick="clearCustomData()" class="text-xs text-rose-600 hover:text-rose-800 font-semibold px-2.5 py-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 transition" title="Clear all user-uploaded rows">
+                            Clear Custom
+                        </button>
+                        <button onclick="switchTab('records')" class="text-xs text-slate-600 hover:text-emerald-700 font-semibold px-2.5 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 transition">
+                            + New Entry Form
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right: Interactive 'What-If' Parameter Simulation Studio -->
+            <section class="lg:col-span-7 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between space-y-3">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-emerald-800 font-bold text-sm flex items-center gap-1.5">
+                            <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+                            Dynamic User-Defined "What-If" Simulation Controls
+                        </span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span id="simActiveIndicator" class="text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-slate-100 text-slate-500">Neutral (1.0x)</span>
+                        <button onclick="resetSimulations()" class="text-[11px] text-slate-500 hover:text-emerald-700 font-medium underline">Reset Sliders</button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                    <!-- Slider 1: Rainfall Adjustment -->
+                    <div class="bg-blue-50/60 p-2.5 rounded-xl border border-blue-100">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-[11px] font-bold text-blue-900">Rainfall Variance</span>
+                            <span id="simRainVal" class="text-xs font-mono font-bold text-blue-700">0%</span>
+                        </div>
+                        <input id="sliderRain" type="range" min="-50" max="50" step="5" value="0" oninput="onSimulationChange()" class="w-full h-1.5 bg-blue-200 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                        <div class="flex justify-between text-[10px] text-blue-500 font-mono mt-1">
+                            <span>-50%</span>
+                            <span>Normal</span>
+                            <span>+50%</span>
+                        </div>
+                    </div>
+
+                    <!-- Slider 2: Cultivated Area Expansion Factor -->
+                    <div class="bg-amber-50/60 p-2.5 rounded-xl border border-amber-100">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-[11px] font-bold text-amber-900">Area Multiplier</span>
+                            <span id="simAreaVal" class="text-xs font-mono font-bold text-amber-700">1.00x</span>
+                        </div>
+                        <input id="sliderArea" type="range" min="0.5" max="2.0" step="0.05" value="1.0" oninput="onSimulationChange()" class="w-full h-1.5 bg-amber-200 rounded-lg appearance-none cursor-pointer accent-amber-600">
+                        <div class="flex justify-between text-[10px] text-amber-600 font-mono mt-1">
+                            <span>0.5x</span>
+                            <span>1.0x</span>
+                            <span>2.0x</span>
+                        </div>
+                    </div>
+
+                    <!-- Slider 3: Technology / Yield Boost Factor -->
+                    <div class="bg-emerald-50/60 p-2.5 rounded-xl border border-emerald-100">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-[11px] font-bold text-emerald-900">Yield Tech Factor</span>
+                            <span id="simYieldVal" class="text-xs font-mono font-bold text-emerald-700">0%</span>
+                        </div>
+                        <input id="sliderYield" type="range" min="-30" max="50" step="5" value="0" oninput="onSimulationChange()" class="w-full h-1.5 bg-emerald-200 rounded-lg appearance-none cursor-pointer accent-emerald-600">
+                        <div class="flex justify-between text-[10px] text-emerald-600 font-mono mt-1">
+                            <span>-30%</span>
+                            <span>Baseline</span>
+                            <span>+50%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-[11px] text-slate-500 flex items-center justify-between">
+                    <span>Live projection dynamically modifies active data records and re-evaluates all calculations instantaneously.</span>
+                    <span class="text-emerald-700 font-semibold" id="simProductionImpact">Production Delta: 0.0%</span>
+                </div>
+            </section>
+        </div>
+
+        <!-- Filter Controls Bar -->
+        <section class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-4 items-center justify-between">
+            <div class="flex flex-wrap items-center gap-3">
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Filter Crop</label>
+                    <select id="cropFilter" onchange="applyFilters()" class="text-xs bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-emerald-500 font-medium text-slate-700">
+                        <option value="ALL">All Crops</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Filter Region</label>
+                    <select id="regionFilter" onchange="applyFilters()" class="text-xs bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-emerald-500 font-medium text-slate-700">
+                        <option value="ALL">All Regions</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Start Year</label>
+                    <select id="yearStart" onchange="applyFilters()" class="text-xs bg-slate-50 border border-slate-300 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-emerald-500 text-slate-700 font-medium"></select>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">End Year</label>
+                    <select id="yearEnd" onchange="applyFilters()" class="text-xs bg-slate-50 border border-slate-300 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-emerald-500 text-slate-700 font-medium"></select>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Search Keywords</label>
+                    <input id="searchKeyword" type="text" oninput="applyFilters()" placeholder="Crop, Region, ID..." class="text-xs bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-emerald-500 text-slate-700 w-36">
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <button onclick="resetFilters()" class="text-xs text-slate-600 hover:text-emerald-700 font-semibold px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 transition">Reset Filters</button>
+            </div>
+        </section>
+
+        <!-- KPI Metrics Grid -->
+        <section class="grid grid-cols-2 md:grid-cols-5 gap-3.5">
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Production</div>
+                <div class="text-xl sm:text-2xl font-black text-slate-800 mt-1" id="kpiProduction">-</div>
+                <div class="text-[11px] text-emerald-600 font-medium mt-0.5 flex items-center justify-between">
+                    <span>Metric tons</span>
+                    <span id="kpiProdSimDiff" class="font-mono text-[10px] hidden"></span>
+                </div>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Cultivated Area</div>
+                <div class="text-xl sm:text-2xl font-black text-slate-800 mt-1" id="kpiArea">-</div>
+                <div class="text-[11px] text-slate-500 font-medium mt-0.5">Hectares (ha)</div>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Weighted Yield</div>
+                <div class="text-xl sm:text-2xl font-black text-emerald-700 mt-1" id="kpiYield">-</div>
+                <div class="text-[11px] text-emerald-600 font-medium mt-0.5">t/ha (Prod / Area)</div>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Average Rainfall</div>
+                <div class="text-xl sm:text-2xl font-black text-blue-600 mt-1" id="kpiRainfall">-</div>
+                <div class="text-[11px] text-blue-600 font-medium mt-0.5">Millimeters (mm)</div>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm col-span-2 md:col-span-1">
+                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active Records</div>
+                <div class="text-xl sm:text-2xl font-black text-indigo-600 mt-1" id="kpiCount">-</div>
+                <div class="text-[11px] text-indigo-600 font-medium mt-0.5">Mode: <span id="kpiModeName" class="font-bold">Preset</span></div>
+            </div>
+        </section>
+
+        <!-- Main Workspace Tabs -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <!-- Tab Headers -->
+            <div class="flex border-b border-slate-200 text-xs sm:text-sm overflow-x-auto px-4 bg-slate-50/70">
+                <button onclick="switchTab('trends')" id="tab-btn-trends" class="py-3 px-3.5 font-medium whitespace-nowrap tab-active transition">📈 Historical & Projected Trends</button>
+                <button onclick="switchTab('reports')" id="tab-btn-reports" class="py-3 px-3.5 font-medium whitespace-nowrap text-slate-500 hover:text-slate-800 transition">🌱 Crop & Region Breakdown</button>
+                <button onclick="switchTab('rainfall')" id="tab-btn-rainfall" class="py-3 px-3.5 font-medium whitespace-nowrap text-slate-500 hover:text-slate-800 transition">🌧️ Rainfall Correlation Analysis</button>
+                <button onclick="switchTab('matrix')" id="tab-btn-matrix" class="py-3 px-3.5 font-medium whitespace-nowrap text-slate-500 hover:text-slate-800 transition">📊 Pivot Matrix</button>
+                <button onclick="switchTab('records')" id="tab-btn-records" class="py-3 px-3.5 font-medium whitespace-nowrap text-slate-500 hover:text-slate-800 transition">✍️ User Ingestion & Data Grid</button>
+                <button onclick="switchTab('schema')" id="tab-btn-schema" class="py-3 px-3.5 font-medium whitespace-nowrap text-slate-500 hover:text-slate-800 transition">🗄️ SQL Relational Schema</button>
+            </div>
+
+            <!-- Tab 1: Historical & Projected Trends -->
+            <div id="tab-content-trends" class="p-6 space-y-6">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-800">Longitudinal Performance Trajectory</h2>
+                        <p class="text-xs text-slate-500">Track production volume, land cultivation, and calculated yield over multi-year horizons with live user simulations.</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <label class="text-xs font-semibold text-slate-600">Metric:</label>
+                        <select id="trendMetricSelect" onchange="renderTrendsChart()" class="text-xs bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 text-slate-700 font-medium">
+                            <option value="production">Total Production (Metric Tons)</option>
+                            <option value="calculated_yield">Weighted Yield (t/ha)</option>
+                            <option value="cultivated_area">Cultivated Area (ha)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="h-80 w-full relative">
+                    <canvas id="trendsChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Tab 2: Crop & Regional Summary -->
+            <div id="tab-content-reports" class="p-6 hidden space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Crop Breakdown -->
+                    <div class="bg-slate-50/70 p-4 rounded-xl border border-slate-200">
+                        <h3 class="text-sm font-bold text-slate-800 mb-2">Crop Production & Weighted Yield</h3>
+                        <div class="h-64 mb-4">
+                            <canvas id="cropChart"></canvas>
+                        </div>
+                        <div class="overflow-x-auto max-h-56">
+                            <table class="w-full text-left text-xs border-collapse">
+                                <thead>
+                                    <tr class="border-b border-slate-200 text-slate-500 uppercase sticky top-0 bg-slate-50">
+                                        <th class="py-1.5 px-2">Crop</th>
+                                        <th class="py-1.5 px-2 text-right">Production (t)</th>
+                                        <th class="py-1.5 px-2 text-right">Area (ha)</th>
+                                        <th class="py-1.5 px-2 text-right">Yield (t/ha)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cropTableBody" class="divide-y divide-slate-100 font-medium"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Region Breakdown -->
+                    <div class="bg-slate-50/70 p-4 rounded-xl border border-slate-200">
+                        <h3 class="text-sm font-bold text-slate-800 mb-2">Regional Production Share</h3>
+                        <div class="h-64 mb-4">
+                            <canvas id="regionChart"></canvas>
+                        </div>
+                        <div class="overflow-x-auto max-h-56">
+                            <table class="w-full text-left text-xs border-collapse">
+                                <thead>
+                                    <tr class="border-b border-slate-200 text-slate-500 uppercase sticky top-0 bg-slate-50">
+                                        <th class="py-1.5 px-2">Region</th>
+                                        <th class="py-1.5 px-2 text-right">Production (t)</th>
+                                        <th class="py-1.5 px-2 text-right">Area (ha)</th>
+                                        <th class="py-1.5 px-2 text-right">Avg Rain</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="regionTableBody" class="divide-y divide-slate-100 font-medium"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 3: Rainfall Correlation -->
+            <div id="tab-content-rainfall" class="p-6 hidden space-y-5">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-800">Rainfall vs Calculated Yield Pattern</h2>
+                        <p class="text-xs text-slate-500">Non-causal Pearson correlation and linear regression evaluating meteorological co-occurrence.</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg text-xs">
+                            Pearson <span class="font-bold font-mono text-emerald-700 ml-1" id="corrR">r = 0.00</span>
+                        </div>
+                        <div class="bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg text-xs">
+                            Coeff of Det <span class="font-bold font-mono text-emerald-700 ml-1" id="corrR2">R² = 0.00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-3.5 rounded-lg bg-amber-50 border-l-4 border-amber-400 text-amber-900 text-xs">
+                    <strong>Agronomic Notice:</strong> Observational association only. A high statistical correlation describes mathematical co-variance; it does not establish agronomic causality without controlled multi-variable soil and nutrient field trials.
+                </div>
+
+                <div class="h-80 w-full relative">
+                    <canvas id="scatterChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Tab 4: Pivot Matrix -->
+            <div id="tab-content-matrix" class="p-6 hidden space-y-4">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-800">Cross-Tabulated Matrix (Crop vs Year)</h2>
+                        <p class="text-xs text-slate-500">Total harvest aggregation across user-selected metrics.</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label class="text-xs font-semibold text-slate-600">Metric Value:</label>
+                        <select id="matrixMetric" onchange="renderMatrixTable()" class="text-xs bg-slate-50 border border-slate-300 rounded px-2.5 py-1 text-slate-700 font-medium">
+                            <option value="production">Total Production (metric tons)</option>
+                            <option value="yield">Weighted Yield (t/ha)</option>
+                            <option value="area">Cultivated Area (ha)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                    <table class="w-full text-left text-xs">
+                        <thead id="matrixHead" class="bg-slate-100 text-slate-700 uppercase font-bold border-b border-slate-200"></thead>
+                        <tbody id="matrixBody" class="divide-y divide-slate-100 font-mono text-slate-700"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab 5: Data Records & User Entry (Expanded & Enhanced) -->
+            <div id="tab-content-records" class="p-6 hidden space-y-6">
+                <!-- User Ingestion Container: Form & CSV Dropzone -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <!-- Manual Record Ingestion Form -->
+                    <div class="lg:col-span-8 bg-emerald-50/40 p-5 rounded-2xl border border-emerald-200">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-sm font-bold text-emerald-950 flex items-center gap-1.5">
+                                <span>✍️</span> Single Record Ingestion & Validation
+                            </h3>
+                            <span class="text-[11px] text-emerald-800 font-mono" id="formAutoYieldBadge">Auto Yield: 0.00 t/ha</span>
+                        </div>
+                        <form id="recordForm" onsubmit="addManualRecord(event)" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5 text-xs">
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Crop Name <span class="text-rose-500">*</span></label>
+                                <input id="inCrop" type="text" required placeholder="e.g. Wheat, Barley" class="w-full p-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Region Name <span class="text-rose-500">*</span></label>
+                                <input id="inRegion" type="text" required placeholder="e.g. Central Valley" class="w-full p-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Year <span class="text-rose-500">*</span></label>
+                                <input id="inYear" type="number" required min="1950" max="2050" value="2024" class="w-full p-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Cultivated Area (ha) <span class="text-rose-500">*</span></label>
+                                <input id="inArea" type="number" required min="1" step="any" placeholder="e.g. 15000" oninput="updateFormYieldPreview()" class="w-full p-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Production (metric tons) <span class="text-rose-500">*</span></label>
+                                <input id="inProd" type="number" required min="0" step="any" placeholder="e.g. 60000" oninput="updateFormYieldPreview()" class="w-full p-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-slate-700 mb-1">Rainfall (mm) [Optional]</label>
+                                <input id="inRain" type="number" min="0" step="any" placeholder="e.g. 740" class="w-full p-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none">
+                            </div>
+                            <div class="sm:col-span-2 md:col-span-3 flex items-center justify-between pt-2">
+                                <div class="text-[11px] text-slate-500 italic">
+                                    Yield is automatically evaluated as <code>production / area</code> in t/ha.
+                                </div>
+                                <button type="submit" class="px-5 py-2 bg-emerald-700 hover:bg-emerald-600 active:scale-95 text-white font-bold rounded-lg transition shadow-sm flex items-center gap-1.5">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                    Insert Record & Synchronize
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Drag & Drop Upload Zone -->
+                    <div class="lg:col-span-4 bg-slate-50 p-5 rounded-2xl border-2 border-dashed border-slate-300 flex flex-col justify-center items-center text-center space-y-2 hover:border-emerald-500 transition group"
+                         ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
+                        <div class="p-3 bg-white rounded-full shadow-sm border border-slate-200 group-hover:scale-105 transition">
+                            <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                        </div>
+                        <div>
+                            <span class="text-xs font-bold text-slate-700 block">Drag & Drop Custom CSV File</span>
+                            <span class="text-[11px] text-slate-400">or click button below to browse local storage</span>
+                        </div>
+                        <label class="cursor-pointer bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-300 font-semibold text-xs px-3 py-1.5 rounded-lg shadow-xs transition">
+                            Browse File
+                            <input type="file" accept=".csv,text/csv" class="hidden" onchange="handleFileUpload(event)">
+                        </label>
+                        <span class="text-[10px] text-slate-400">Accepted headers: crop, region, year, area, production, rainfall</span>
+                    </div>
+                </div>
+
+                <!-- Records Table Header & Search -->
+                <div class="flex flex-wrap justify-between items-center gap-3 pt-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold text-slate-800">Dataset Records (<span id="recordRowCount" class="text-emerald-700">0</span>)</span>
+                        <span id="activeWorkspaceIndicator" class="text-[10px] bg-slate-200 text-slate-700 font-mono px-2 py-0.5 rounded">Preset Data</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="downloadCSVExport()" class="text-xs text-slate-600 hover:text-emerald-700 border border-slate-300 px-2.5 py-1 rounded bg-white">
+                            📥 Download Active Table CSV
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Records Table -->
+                <div class="overflow-x-auto border border-slate-200 rounded-xl shadow-xs">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-100 text-slate-700 font-semibold uppercase tracking-wider">
+                            <tr>
+                                <th class="py-2.5 px-3">Record ID</th>
+                                <th class="py-2.5 px-3">Crop</th>
+                                <th class="py-2.5 px-3">Region</th>
+                                <th class="py-2.5 px-3">Year</th>
+                                <th class="py-2.5 px-3 text-right">Area (ha)</th>
+                                <th class="py-2.5 px-3 text-right">Production (t)</th>
+                                <th class="py-2.5 px-3 text-right">Yield (t/ha)</th>
+                                <th class="py-2.5 px-3 text-right">Rain (mm)</th>
+                                <th class="py-2.5 px-3 text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rawTableBody" class="divide-y divide-slate-100 font-mono text-slate-700"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab 6: SQL Relational Schema -->
+            <div id="tab-content-schema" class="p-6 hidden space-y-4">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h2 class="text-base font-bold text-slate-800">schema.sql (MySQL Relational Architecture)</h2>
+                        <p class="text-xs text-slate-500">Includes constraints, multi-column uniqueness, foreign keys, and yield integrity checks.</p>
+                    </div>
+                    <button onclick="copySQLSchema()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-mono transition">
+                        📋 Copy SQL
+                    </button>
+                </div>
+                <pre id="sqlPreBlock" class="bg-slate-900 text-emerald-400 p-4 rounded-xl font-mono text-xs overflow-x-auto leading-relaxed border border-slate-800">
+CREATE DATABASE IF NOT EXISTS agricrop_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE agricrop_db;
+
+-- 1. Regions Entity
+CREATE TABLE IF NOT EXISTS regions (
+    region_id VARCHAR(50) PRIMARY KEY,
+    region_name VARCHAR(100) NOT NULL,
+    country VARCHAR(100) DEFAULT 'Global',
+    climate_zone VARCHAR(100) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- 2. Crops Entity
+CREATE TABLE IF NOT EXISTS crops (
+    crop_id VARCHAR(50) PRIMARY KEY,
+    crop_name VARCHAR(100) NOT NULL,
+    category ENUM('Cereal', 'Grain', 'Legume', 'Cash Crop', 'Vegetable', 'Fruit', 'Oilseed', 'Other') DEFAULT 'Cereal',
+    scientific_name VARCHAR(150) DEFAULT NULL,
+    typical_min_yield FLOAT DEFAULT 0.0,
+    typical_max_yield FLOAT DEFAULT 20.0,
+    yield_unit VARCHAR(30) DEFAULT 't/ha',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- 3. Crop Records Entity
+CREATE TABLE IF NOT EXISTS crop_records (
+    record_id VARCHAR(64) PRIMARY KEY,
+    crop_id VARCHAR(50) NOT NULL,
+    region_id VARCHAR(50) NOT NULL,
+    year INT NOT NULL,
+    cultivated_area DOUBLE NOT NULL,
+    area_unit VARCHAR(20) NOT NULL DEFAULT 'ha',
+    production DOUBLE NOT NULL,
+    production_unit VARCHAR(20) NOT NULL DEFAULT 'metric tons',
+    calculated_yield DOUBLE NULL,
+    yield_unit VARCHAR(30) NOT NULL DEFAULT 't/ha',
+    rainfall_mm DOUBLE NULL,
+    notes TEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    CONSTRAINT fk_record_crop FOREIGN KEY (crop_id) 
+        REFERENCES crops (crop_id) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT fk_record_region FOREIGN KEY (region_id) 
+        REFERENCES regions (region_id) ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT chk_cultivated_area CHECK (cultivated_area >= 0),
+    CONSTRAINT chk_production CHECK (production >= 0),
+    CONSTRAINT uq_crop_region_year UNIQUE (crop_id, region_id, year)
+) ENGINE=InnoDB;
+
+CREATE INDEX idx_records_year ON crop_records (year);
+CREATE INDEX idx_records_crop_year ON crop_records (crop_id, year);
+CREATE INDEX idx_records_region_year ON crop_records (region_id, year);
+CREATE INDEX idx_records_rainfall ON crop_records (rainfall_mm);</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Record Modal -->
+    <div id="editModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+            <h3 class="text-base font-bold text-slate-800 mb-3">Edit Crop Record</h3>
+            <form id="editRecordForm" onsubmit="saveEditedRecord(event)" class="space-y-3 text-xs">
+                <input type="hidden" id="editRecordId">
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Crop Name</label>
+                    <input id="editCrop" type="text" required class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-emerald-500">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Region Name</label>
+                    <input id="editRegion" type="text" required class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-emerald-500">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Year</label>
+                        <input id="editYear" type="number" required class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Rainfall (mm)</label>
+                        <input id="editRain" type="number" step="any" class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Area (ha)</label>
+                        <input id="editArea" type="number" min="1" step="any" required class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Production (t)</label>
+                        <input id="editProd" type="number" min="0" step="any" required class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 pt-3">
+                    <button type="button" onclick="closeEditModal()" class="px-3 py-1.5 border border-slate-300 rounded text-slate-600 hover:bg-slate-50">Cancel</button>
+                    <button type="submit" class="px-4 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white font-bold rounded">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Application Script Engine -->
+    <script>
+        // Preset Datasets Generator
+        function generatePreset(presetKey) {
+            let records = [];
+            if (presetKey === "north_america") {
+                const regions = [["reg_ia", "Iowa Corn Belt"], ["reg_il", "Illinois Basin"], ["reg_sk", "Saskatchewan Prairies"]];
+                const crops = [["maize", "Maize (Corn)", 11.2], ["soybeans", "Soybeans", 3.4], ["wheat", "Wheat", 4.1]];
+                for (let y = 2014; y <= 2024; y++) {
+                    let trend = 1.0 + (y - 2014) * 0.012;
+                    regions.forEach(([reg_id, reg_name]) => {
+                        let rainfall = Math.round((820 + (y % 3) * 20 + Math.sin(y * 1.5) * 45) * 10) / 10;
+                        crops.forEach(([crop_id, crop_name, base_y]) => {
+                            let area = 1200000 + ((y * 17) % 80000);
+                            let yield_val = Math.round(base_y * trend * (1.0 + (rainfall - 800) / 4500) * 100) / 100;
+                            let prod = Math.round(area * yield_val);
+                            records.push({
+                                record_id: `REC-${reg_id.slice(4)}-${crop_id.slice(0,3)}-${y}`,
+                                crop_id, crop_name, region_id: reg_id, region_name: reg_name,
+                                year: y, cultivated_area: area, production: prod,
+                                calculated_yield: yield_val, rainfall_mm: rainfall
+                            });
+                        });
+                    });
+                }
+            } else if (presetKey === "indo_gangetic") {
+                const regions = [["reg_punjab", "Punjab Agricultural Plains"], ["reg_haryana", "Haryana Plains"], ["reg_up", "Western Uttar Pradesh"]];
+                const crops = [["rice", "Rice (Paddy)", 4.3], ["wheat", "Wheat", 4.8], ["sugarcane", "Sugarcane", 75.0]];
+                for (let y = 2014; y <= 2024; y++) {
+                    let trend = 1.0 + (y - 2014) * 0.015;
+                    regions.forEach(([reg_id, reg_name]) => {
+                        let rainfall = Math.round((680 + Math.cos(y) * 60) * 10) / 10;
+                        crops.forEach(([crop_id, crop_name, base_y]) => {
+                            let area = 1850000 + ((y * 23) % 110000);
+                            let yield_val = Math.round(base_y * trend * 100) / 100;
+                            let prod = Math.round(area * yield_val);
+                            records.push({
+                                record_id: `REC-IGP-${reg_id.slice(4)}-${crop_id.slice(0,3)}-${y}`,
+                                crop_id, crop_name, region_id: reg_id, region_name: reg_name,
+                                year: y, cultivated_area: area, production: prod,
+                                calculated_yield: yield_val, rainfall_mm: rainfall
+                            });
+                        });
+                    });
+                }
+            } else { // Global default
+                const regions = [
+                    ["reg_us_mw", "North America (Midwest)"],
+                    ["reg_eu_west", "Western Europe (Rhine-Danube)"],
+                    ["reg_sa_pampas", "South America (Pampas)"],
+                    ["reg_asia_east", "East Asia (Yangtze-Yellow)"],
+                    ["reg_sa_indo", "South Asia (Indo-Gangetic)"]
+                ];
+                const crops = [["wheat", "Wheat", 3.8], ["rice", "Rice (Paddy)", 4.6], ["maize", "Maize (Corn)", 6.2], ["soybeans", "Soybeans", 2.9]];
+                for (let y = 2014; y <= 2024; y++) {
+                    let trend = 1.0 + (y - 2014) * 0.011;
+                    regions.forEach(([reg_id, reg_name]) => {
+                        let rainfall = Math.round((740 + Math.sin(y) * 45) * 10) / 10;
+                        crops.forEach(([crop_id, crop_name, base_y]) => {
+                            let area = 3200000 + ((y * 31) % 180000);
+                            let yield_val = Math.round(base_y * trend * 100) / 100;
+                            let prod = Math.round(area * yield_val);
+                            records.push({
+                                record_id: `REC-GLB-${reg_id.slice(4)}-${crop_id.slice(0,3)}-${y}`,
+                                crop_id, crop_name, region_id: reg_id, region_name: reg_name,
+                                year: y, cultivated_area: area, production: prod,
+                                calculated_yield: yield_val, rainfall_mm: rainfall
+                            });
+                        });
+                    });
+                }
+            }
+            return records;
+        }
+
+        // Global State Management
+        let presetRecords = [];
+        let customRecords = [];
+        let activeRecords = [];      // Records based on mode
+        let simulatedRecords = [];   // Active records post user simulation sliders
+        let filteredRecords = [];    // Simulated records post filters
+        let currentMode = 'preset';  // 'preset' | 'custom'
+        let chartInstances = {};
+
+        // Simulation parameters
+        let simParams = {
+            rainfallDeltaPct: 0,
+            areaMultiplier: 1.0,
+            yieldTechDeltaPct: 0
+        };
+
+        // Initialize App
+        function initializeApp() {
+            presetRecords = generatePreset('global');
+            // Populate sample user-defined data for initial test
+            customRecords = [
+                {
+                    record_id: "USR-001",
+                    crop_id: "sorghum",
+                    crop_name: "Sorghum",
+                    region_id: "reg_sahel",
+                    region_name: "Sub-Saharan Belt",
+                    year: 2022,
+                    cultivated_area: 840000,
+                    production: 1260000,
+                    calculated_yield: 1.5,
+                    rainfall_mm: 520
+                },
+                {
+                    record_id: "USR-002",
+                    crop_id: "sorghum",
+                    crop_name: "Sorghum",
+                    region_id: "reg_sahel",
+                    region_name: "Sub-Saharan Belt",
+                    year: 2023,
+                    cultivated_area: 890000,
+                    production: 1424000,
+                    calculated_yield: 1.6,
+                    rainfall_mm: 560
+                },
+                {
+                    record_id: "USR-003",
+                    crop_id: "millet",
+                    crop_name: "Pearl Millet",
+                    region_id: "reg_rajasthan",
+                    region_name: "Thar Transition Zone",
+                    year: 2023,
+                    cultivated_area: 450000,
+                    production: 540000,
+                    calculated_yield: 1.2,
+                    rainfall_mm: 380
+                }
+            ];
+
+            setOperationalMode('preset', false);
+            showToast("AgriCrop Analytics ready with User-Defined input support.", "info");
+        }
+
+        // Switch between Preset and Custom dataset mode
+        function setOperationalMode(mode, triggerNotify = true) {
+            currentMode = mode;
+            const btnPreset = document.getElementById('btnModePreset');
+            const btnCustom = document.getElementById('btnModeCustom');
+            const modeBadge = document.getElementById('dataModeBadge');
+            const kpiModeName = document.getElementById('kpiModeName');
+            const activeWorkspaceIndicator = document.getElementById('activeWorkspaceIndicator');
+
+            if (mode === 'preset') {
+                btnPreset.className = "flex-1 py-1 text-xs font-bold rounded-md bg-white shadow-sm text-emerald-800 transition";
+                btnCustom.className = "flex-1 py-1 text-xs font-semibold rounded-md text-slate-600 hover:text-slate-900 transition";
+                modeBadge.innerText = "Preset Mode";
+                modeBadge.className = "text-[10px] font-mono tracking-wider font-semibold uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30";
+                kpiModeName.innerText = "Preset Data";
+                activeWorkspaceIndicator.innerText = "Preset Baseline Data";
+                activeRecords = [...presetRecords];
+            } else {
+                btnCustom.className = "flex-1 py-1 text-xs font-bold rounded-md bg-white shadow-sm text-indigo-800 transition";
+                btnPreset.className = "flex-1 py-1 text-xs font-semibold rounded-md text-slate-600 hover:text-slate-900 transition";
+                modeBadge.innerText = "User-Defined Mode";
+                modeBadge.className = "text-[10px] font-mono tracking-wider font-semibold uppercase px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-400/30";
+                kpiModeName.innerText = "User-Defined";
+                activeWorkspaceIndicator.innerText = "User Ingested Workspace";
+                activeRecords = [...customRecords];
+            }
+
+            document.getElementById('recordSourceCount').innerText = `${activeRecords.length} records`;
+            populateDropdownFilters();
+            runSimulationPipeline();
+
+            if (triggerNotify) {
+                showToast(`Switched active operational mode to ${mode === 'preset' ? 'Curated Presets' : 'User-Defined / Custom Data'}.`, "success");
+            }
+        }
+
+        function switchDataSourcePreset(presetKey) {
+            presetRecords = generatePreset(presetKey);
+            if (currentMode === 'preset') {
+                activeRecords = [...presetRecords];
+                document.getElementById('recordSourceCount').innerText = `${activeRecords.length} records`;
+                populateDropdownFilters();
+                runSimulationPipeline();
+                showToast(`Loaded ${presetKey.replace('_', ' ').toUpperCase()} dataset.`, "info");
+            } else {
+                showToast(`Preset cached. Switch Workspace Mode to 'Preset' to inspect.`, "info");
+            }
+        }
+
+        // Live Yield auto-calculation helper in manual entry form
+        function updateFormYieldPreview() {
+            const area = parseFloat(document.getElementById('inArea').value);
+            const prod = parseFloat(document.getElementById('inProd').value);
+            const badge = document.getElementById('formAutoYieldBadge');
+            if (area > 0 && prod >= 0) {
+                const yld = (prod / area).toFixed(2);
+                badge.innerText = `Auto Yield: ${yld} t/ha`;
+                badge.classList.remove('text-emerald-800', 'text-rose-600');
+                badge.classList.add('text-emerald-800');
+            } else {
+                badge.innerText = `Auto Yield: 0.00 t/ha`;
+            }
+        }
+
+        // Add single record manually
+        function addManualRecord(e) {
+            e.preventDefault();
+            const crop = document.getElementById('inCrop').value.trim();
+            const region = document.getElementById('inRegion').value.trim();
+            const year = parseInt(document.getElementById('inYear').value, 10);
+            const area = parseFloat(document.getElementById('inArea').value);
+            const prod = parseFloat(document.getElementById('inProd').value);
+            const rain = document.getElementById('inRain').value ? parseFloat(document.getElementById('inRain').value) : null;
+
+            if (area <= 0) {
+                showToast("Cultivated area must be greater than zero.", "error");
+                return;
+            }
+            if (prod < 0) {
+                showToast("Production cannot be negative.", "error");
+                return;
+            }
+
+            const yld = Math.round((prod / area) * 100) / 100;
+            const newRec = {
+                record_id: `USR-${Date.now().toString().slice(-5)}`,
+                crop_id: crop.toLowerCase().replace(/\s+/g, '_'),
+                crop_name: crop,
+                region_id: region.toLowerCase().replace(/\s+/g, '_'),
+                region_name: region,
+                year: year,
+                cultivated_area: area,
+                production: prod,
+                calculated_yield: yld,
+                rainfall_mm: rain
+            };
+
+            customRecords.unshift(newRec);
+
+            // Automatically switch to user mode to view changes
+            if (currentMode !== 'custom') {
+                setOperationalMode('custom', false);
+            } else {
+                activeRecords = [...customRecords];
+                document.getElementById('recordSourceCount').innerText = `${activeRecords.length} records`;
+                populateDropdownFilters();
+                runSimulationPipeline();
+            }
+
+            document.getElementById('recordForm').reset();
+            updateFormYieldPreview();
+            showToast(`Record for '${crop}' (${region}) added successfully.`, "success");
+        }
+
+        // CSV Drag & Drop Handlers
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.currentTarget.classList.add('border-emerald-500', 'bg-emerald-50/50');
+        }
+        function handleDragLeave(e) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('border-emerald-500', 'bg-emerald-50/50');
+        }
+        function handleDrop(e) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('border-emerald-500', 'bg-emerald-50/50');
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                parseCSVFile(e.dataTransfer.files[0]);
+            }
+        }
+
+        function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (file) {
+                parseCSVFile(file);
+            }
+        }
+
+        // Robust CSV Parser
+        function parseCSVFile(file) {
+            if (!file.name.endsWith('.csv')) {
+                showToast("Please upload a standard .csv format file.", "error");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    const text = event.target.result;
+                    const lines = text.split(/\r\n|\n/).filter(line => line.trim().length > 0);
+                    if (lines.length < 2) {
+                        showToast("The uploaded CSV does not contain sufficient data rows.", "error");
+                        return;
+                    }
+
+                    // Parse header
+                    const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/['"]/g, ''));
+                    
+                    // Match header index flexibility
+                    const getColIdx = (aliases) => headers.findIndex(h => aliases.some(a => h.includes(a)));
+
+                    const cropIdx = getColIdx(['crop', 'crop_name', 'commodity']);
+                    const regIdx = getColIdx(['region', 'state', 'location', 'area_name']);
+                    const yearIdx = getColIdx(['year', 'date', 'period']);
+                    const areaIdx = getColIdx(['area', 'cultivated', 'ha']);
+                    const prodIdx = getColIdx(['prod', 'production', 'harvest', 'yield_total']);
+                    const rainIdx = getColIdx(['rain', 'rainfall', 'precipitation', 'mm']);
+
+                    if (cropIdx === -1 || areaIdx === -1 || prodIdx === -1) {
+                        showToast("Missing critical columns: 'crop', 'area', and 'production' are required.", "error");
+                        return;
+                    }
+
+                    let parsedCount = 0;
+                    let newRows = [];
+
+                    for (let i = 1; i < lines.length; i++) {
+                        const row = lines[i].split(',').map(val => val.trim().replace(/^["']|["']$/g, ''));
+                        if (row.length < 3) continue;
+
+                        const cropName = row[cropIdx] || "Unknown Crop";
+                        const regionName = (regIdx !== -1 && row[regIdx]) ? row[regIdx] : "General Region";
+                        const year = (yearIdx !== -1 && row[yearIdx]) ? parseInt(row[yearIdx], 10) : 2024;
+                        const area = parseFloat(row[areaIdx]);
+                        const prod = parseFloat(row[prodIdx]);
+                        const rain = (rainIdx !== -1 && row[rainIdx] !== "") ? parseFloat(row[rainIdx]) : null;
+
+                        if (isNaN(area) || area <= 0 || isNaN(prod) || prod < 0) continue;
+
+                        const yld = Math.round((prod / area) * 100) / 100;
+                        newRows.push({
+                            record_id: `CSV-${parsedCount + 1}-${Date.now().toString().slice(-4)}`,
+                            crop_id: cropName.toLowerCase().replace(/\s+/g, '_'),
+                            crop_name: cropName,
+                            region_id: regionName.toLowerCase().replace(/\s+/g, '_'),
+                            region_name: regionName,
+                            year: isNaN(year) ? 2024 : year,
+                            cultivated_area: area,
+                            production: prod,
+                            calculated_yield: yld,
+                            rainfall_mm: isNaN(rain) ? null : rain
+                        });
+                        parsedCount++;
+                    }
+
+                    if (newRows.length === 0) {
+                        showToast("No valid agricultural rows were parsed from the file.", "error");
+                        return;
+                    }
+
+                    customRecords = newRows;
+                    setOperationalMode('custom', false);
+                    showToast(`Successfully ingested ${newRows.length} user records from CSV!`, "success");
+
+                } catch (err) {
+                    console.error(err);
+                    showToast("Error reading and processing CSV file.", "error");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // Clear custom data
+        function clearCustomData() {
+            if (customRecords.length === 0) {
+                showToast("Custom dataset is already empty.", "info");
+                return;
+            }
+            customRecords = [];
+            if (currentMode === 'custom') {
+                activeRecords = [];
+                runSimulationPipeline();
+            }
+            showToast("User-defined dataset cleared.", "info");
+        }
+
+        // Delete single record
+        function deleteRecord(recId) {
+            if (currentMode === 'custom') {
+                customRecords = customRecords.filter(r => r.record_id !== recId);
+                activeRecords = [...customRecords];
+            } else {
+                presetRecords = presetRecords.filter(r => r.record_id !== recId);
+                activeRecords = [...presetRecords];
+            }
+            runSimulationPipeline();
+            showToast(`Record ${recId} removed.`, "info");
+        }
+
+        // Edit single record modal workflow
+        function openEditModal(recId) {
+            const item = activeRecords.find(r => r.record_id === recId);
+            if (!item) return;
+
+            document.getElementById('editRecordId').value = item.record_id;
+            document.getElementById('editCrop').value = item.crop_name;
+            document.getElementById('editRegion').value = item.region_name;
+            document.getElementById('editYear').value = item.year;
+            document.getElementById('editArea').value = item.cultivated_area;
+            document.getElementById('editProd').value = item.production;
+            document.getElementById('editRain').value = item.rainfall_mm ?? '';
+
+            document.getElementById('editModal').classList.remove('hidden');
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.add('hidden');
+        }
+
+        function saveEditedRecord(e) {
+            e.preventDefault();
+            const id = document.getElementById('editRecordId').value;
+            const crop = document.getElementById('editCrop').value.trim();
+            const region = document.getElementById('editRegion').value.trim();
+            const year = parseInt(document.getElementById('editYear').value, 10);
+            const area = parseFloat(document.getElementById('editArea').value);
+            const prod = parseFloat(document.getElementById('editProd').value);
+            const rain = document.getElementById('editRain').value ? parseFloat(document.getElementById('editRain').value) : null;
+
+            const targetArray = (currentMode === 'custom') ? customRecords : presetRecords;
+            const index = targetArray.findIndex(r => r.record_id === id);
+
+            if (index !== -1) {
+                targetArray[index] = {
+                    ...targetArray[index],
+                    crop_name: crop,
+                    crop_id: crop.toLowerCase().replace(/\s+/g, '_'),
+                    region_name: region,
+                    region_id: region.toLowerCase().replace(/\s+/g, '_'),
+                    year,
+                    cultivated_area: area,
+                    production: prod,
+                    calculated_yield: area > 0 ? Math.round((prod / area) * 100) / 100 : 0,
+                    rainfall_mm: rain
+                };
+
+                activeRecords = [...targetArray];
+                populateDropdownFilters();
+                runSimulationPipeline();
+                closeEditModal();
+                showToast(`Record ${id} updated successfully.`, "success");
+            }
+        }
+
+        // Interactive "What-If" Simulation Studio
+        function onSimulationChange() {
+            simParams.rainfallDeltaPct = parseFloat(document.getElementById('sliderRain').value);
+            simParams.areaMultiplier = parseFloat(document.getElementById('sliderArea').value);
+            simParams.yieldTechDeltaPct = parseFloat(document.getElementById('sliderYield').value);
+
+            document.getElementById('simRainVal').innerText = `${simParams.rainfallDeltaPct > 0 ? '+' : ''}${simParams.rainfallDeltaPct}%`;
+            document.getElementById('simAreaVal').innerText = `${simParams.areaMultiplier.toFixed(2)}x`;
+            document.getElementById('simYieldVal').innerText = `${simParams.yieldTechDeltaPct > 0 ? '+' : ''}${simParams.yieldTechDeltaPct}%`;
+
+            const isNeutral = (simParams.rainfallDeltaPct === 0 && simParams.areaMultiplier === 1.0 && simParams.yieldTechDeltaPct === 0);
+            const indicator = document.getElementById('simActiveIndicator');
+            if (isNeutral) {
+                indicator.innerText = "Neutral (1.0x)";
+                indicator.className = "text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-slate-100 text-slate-500";
+            } else {
+                indicator.innerText = "Active Scenario Simulation";
+                indicator.className = "text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-amber-500/20 text-amber-800 border border-amber-300";
+            }
+
+            runSimulationPipeline();
+        }
+
+        function resetSimulations() {
+            document.getElementById('sliderRain').value = 0;
+            document.getElementById('sliderArea').value = 1.0;
+            document.getElementById('sliderYield').value = 0;
+            onSimulationChange();
+            showToast("Simulation parameters reset to baseline.", "info");
+        }
+
+        // Simulation Calculation Pipeline
+        function runSimulationPipeline() {
+            const rainFactor = 1.0 + (simParams.rainfallDeltaPct / 100);
+            const areaFactor = simParams.areaMultiplier;
+            const yieldTechFactor = 1.0 + (simParams.yieldTechDeltaPct / 100);
+
+            // Calculate simulated records dynamically
+            simulatedRecords = activeRecords.map(r => {
+                const adjArea = Math.round(r.cultivated_area * areaFactor);
+                // Rainfall impact elasticity factor: non-linear mild response (0.35 elasticity)
+                const rainAgronomicImpact = (r.rainfall_mm != null) ? 1.0 + ((rainFactor - 1.0) * 0.35) : 1.0;
+                const adjYield = Math.round(r.calculated_yield * yieldTechFactor * rainAgronomicImpact * 100) / 100;
+                const adjProd = Math.round(adjArea * adjYield);
+                const adjRain = r.rainfall_mm != null ? Math.round(r.rainfall_mm * rainFactor * 10) / 10 : null;
+
+                return {
+                    ...r,
+                    cultivated_area: adjArea,
+                    calculated_yield: adjYield,
+                    production: adjProd,
+                    rainfall_mm: adjRain,
+                    _originalYield: r.calculated_yield,
+                    _originalProd: r.production
+                };
+            });
+
+            // Compute overall production impact
+            const baseProd = activeRecords.reduce((sum, r) => sum + r.production, 0);
+            const simProd = simulatedRecords.reduce((sum, r) => sum + r.production, 0);
+            const diffPct = baseProd > 0 ? (((simProd - baseProd) / baseProd) * 100).toFixed(1) : 0;
+            
+            const prodImpactElem = document.getElementById('simProductionImpact');
+            prodImpactElem.innerText = `Production Delta: ${diffPct > 0 ? '+' : ''}${diffPct}%`;
+            prodImpactElem.className = diffPct >= 0 ? 'text-emerald-700 font-semibold' : 'text-rose-600 font-semibold';
+
+            const kpiDiffBadge = document.getElementById('kpiProdSimDiff');
+            if (baseProd > 0 && diffPct != 0) {
+                kpiDiffBadge.classList.remove('hidden');
+                kpiDiffBadge.innerText = `Sim: ${diffPct > 0 ? '+' : ''}${diffPct}%`;
+                kpiDiffBadge.className = `font-mono text-[10px] font-bold ${diffPct >= 0 ? 'text-emerald-600' : 'text-rose-600'}`;
+            } else {
+                kpiDiffBadge.classList.add('hidden');
+            }
+
+            applyFilters();
+        }
+
+        // Filtering Pipeline
+        function populateDropdownFilters() {
+            const crops = [...new Set(activeRecords.map(r => r.crop_name))].sort();
+            const regions = [...new Set(activeRecords.map(r => r.region_name))].sort();
+            const years = [...new Set(activeRecords.map(r => r.year))].sort((a,b) => a - b);
+
+            const cropSelect = document.getElementById('cropFilter');
+            cropSelect.innerHTML = '<option value="ALL">All Crops</option>' + crops.map(c => `<option value="${c}">${c}</option>`).join('');
+
+            const regSelect = document.getElementById('regionFilter');
+            regSelect.innerHTML = '<option value="ALL">All Regions</option>' + regions.map(r => `<option value="${r}">${r}</option>`).join('');
+
+            const yStart = document.getElementById('yearStart');
+            const yEnd = document.getElementById('yearEnd');
+            if (years.length > 0) {
+                yStart.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
+                yEnd.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
+                yStart.value = years[0];
+                yEnd.value = years[years.length - 1];
+            } else {
+                yStart.innerHTML = '<option value="2024">2024</option>';
+                yEnd.innerHTML = '<option value="2024">2024</option>';
+            }
+        }
+
+        function applyFilters() {
+            const crop = document.getElementById('cropFilter').value;
+            const region = document.getElementById('regionFilter').value;
+            const yStart = parseInt(document.getElementById('yearStart').value, 10);
+            const yEnd = parseInt(document.getElementById('yearEnd').value, 10);
+            const query = (document.getElementById('searchKeyword').value || "").toLowerCase().trim();
+
+            filteredRecords = simulatedRecords.filter(r => {
+                const matchCrop = (crop === 'ALL' || r.crop_name === crop);
+                const matchRegion = (region === 'ALL' || r.region_name === region);
+                const matchYear = (isNaN(yStart) || isNaN(yEnd)) ? true : (r.year >= yStart && r.year <= yEnd);
+                const matchQuery = query === "" || 
+                    r.crop_name.toLowerCase().includes(query) || 
+                    r.region_name.toLowerCase().includes(query) || 
+                    r.record_id.toLowerCase().includes(query);
+
+                return matchCrop && matchRegion && matchYear && matchQuery;
+            });
+
+            updateKPIs();
+            renderTrendsChart();
+            renderReports();
+            renderRainfallAnalysis();
+            renderMatrixTable();
+            renderRecordsTable();
+        }
+
+        function resetFilters() {
+            document.getElementById('cropFilter').value = 'ALL';
+            document.getElementById('regionFilter').value = 'ALL';
+            document.getElementById('searchKeyword').value = '';
+            const years = [...new Set(activeRecords.map(r => r.year))].sort((a,b) => a - b);
+            if (years.length > 0) {
+                document.getElementById('yearStart').value = years[0];
+                document.getElementById('yearEnd').value = years[years.length - 1];
+            }
+            applyFilters();
+            showToast("Filters restored to defaults.", "info");
+        }
+
+        // Dashboard Metrics update
+        function updateKPIs() {
+            const totalProd = filteredRecords.reduce((sum, r) => sum + r.production, 0);
+            const totalArea = filteredRecords.reduce((sum, r) => sum + r.cultivated_area, 0);
+            const weightedYield = totalArea > 0 ? (totalProd / totalArea).toFixed(2) : "0.00";
+            const rains = filteredRecords.map(r => r.rainfall_mm).filter(r => r != null);
+            const avgRain = rains.length > 0 ? (rains.reduce((a,b)=>a+b, 0) / rains.length).toFixed(1) : "0.0";
+
+            document.getElementById('kpiProduction').innerText = (totalProd >= 1e6) ? (totalProd / 1e6).toFixed(2) + "M" : totalProd.toLocaleString();
+            document.getElementById('kpiArea').innerText = (totalArea >= 1e6) ? (totalArea / 1e6).toFixed(2) + "M" : totalArea.toLocaleString();
+            document.getElementById('kpiYield').innerText = weightedYield + " t/ha";
+            document.getElementById('kpiRainfall').innerText = avgRain + " mm";
+            document.getElementById('kpiCount').innerText = filteredRecords.length.toLocaleString();
+        }
+
+        // Charts & Visualizations
+        function renderTrendsChart() {
+            const metric = document.getElementById('trendMetricSelect').value;
+            const years = [...new Set(filteredRecords.map(r => r.year))].sort((a,b) => a - b);
+            const crops = [...new Set(filteredRecords.map(r => r.crop_name))].sort();
+
+            const datasets = crops.map((crop, idx) => {
+                const colors = ['#059669', '#2563eb', '#d97706', '#9333ea', '#dc2626', '#0891b2', '#4f46e5', '#ca8a04'];
+                const color = colors[idx % colors.length];
+                const data = years.map(y => {
+                    const row = filteredRecords.filter(r => r.crop_name === crop && r.year === y);
+                    if (row.length === 0) return null;
+                    const p = row.reduce((s, r) => s + r.production, 0);
+                    const a = row.reduce((s, r) => s + r.cultivated_area, 0);
+                    if (metric === 'production') return Math.round(p);
+                    if (metric === 'cultivated_area') return Math.round(a);
+                    return a > 0 ? parseFloat((p / a).toFixed(2)) : 0;
+                });
+                return {
+                    label: crop,
+                    data,
+                    borderColor: color,
+                    backgroundColor: color,
+                    tension: 0.25,
+                    borderWidth: 2,
+                    spanGaps: true
+                };
+            });
+
+            if (chartInstances.trends) chartInstances.trends.destroy();
+            const ctx = document.getElementById('trendsChart').getContext('2d');
+            chartInstances.trends = new Chart(ctx, {
+                type: 'line',
+                data: { labels: years, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } },
+                        tooltip: { mode: 'index', intersect: false }
+                    },
+                    scales: {
+                        y: { 
+                            title: { 
+                                display: true, 
+                                text: metric === 'calculated_yield' ? 'Yield (t/ha)' : (metric === 'cultivated_area' ? 'Hectares (ha)' : 'Metric Tons (t)') 
+                            } 
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderReports() {
+            const crops = [...new Set(filteredRecords.map(r => r.crop_name))];
+            const cropData = crops.map(c => {
+                const subset = filteredRecords.filter(r => r.crop_name === c);
+                const prod = subset.reduce((s, r) => s + r.production, 0);
+                const area = subset.reduce((s, r) => s + r.cultivated_area, 0);
+                const yld = area > 0 ? (prod / area).toFixed(2) : "0.00";
+                return { crop: c, prod, area, yield: yld };
+            }).sort((a,b) => b.prod - a.prod);
+
+            document.getElementById('cropTableBody').innerHTML = cropData.map(c => `
+                <tr class="hover:bg-slate-100/80 transition">
+                    <td class="py-1.5 px-2 text-slate-800 font-semibold">${c.crop}</td>
+                    <td class="py-1.5 px-2 text-right font-mono">${c.prod.toLocaleString()}</td>
+                    <td class="py-1.5 px-2 text-right font-mono">${c.area.toLocaleString()}</td>
+                    <td class="py-1.5 px-2 text-right text-emerald-700 font-bold font-mono">${c.yield}</td>
+                </tr>
+            `).join('');
+
+            if (chartInstances.crop) chartInstances.crop.destroy();
+            const ctxCrop = document.getElementById('cropChart').getContext('2d');
+            chartInstances.crop = new Chart(ctxCrop, {
+                type: 'bar',
+                data: {
+                    labels: cropData.map(c => c.crop),
+                    datasets: [{
+                        label: 'Total Production (Tons)',
+                        data: cropData.map(c => c.prod),
+                        backgroundColor: '#059669',
+                        borderRadius: 4
+                    }]
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            const regions = [...new Set(filteredRecords.map(r => r.region_name))];
+            const regData = regions.map(reg => {
+                const subset = filteredRecords.filter(r => r.region_name === reg);
+                const prod = subset.reduce((s, r) => s + r.production, 0);
+                const area = subset.reduce((s, r) => s + r.cultivated_area, 0);
+                const rains = subset.map(r => r.rainfall_mm).filter(r => r != null);
+                const avgRain = rains.length > 0 ? (rains.reduce((a,b)=>a+b, 0) / rains.length).toFixed(1) : "-";
+                return { region: reg, prod, area, avgRain };
+            }).sort((a,b) => b.prod - a.prod);
+
+            document.getElementById('regionTableBody').innerHTML = regData.map(r => `
+                <tr class="hover:bg-slate-100/80 transition">
+                    <td class="py-1.5 px-2 text-slate-800 font-semibold">${r.region}</td>
+                    <td class="py-1.5 px-2 text-right font-mono">${r.prod.toLocaleString()}</td>
+                    <td class="py-1.5 px-2 text-right font-mono">${r.area.toLocaleString()}</td>
+                    <td class="py-1.5 px-2 text-right text-blue-600 font-mono">${r.avgRain} mm</td>
+                </tr>
+            `).join('');
+
+            if (chartInstances.region) chartInstances.region.destroy();
+            const ctxReg = document.getElementById('regionChart').getContext('2d');
+            chartInstances.region = new Chart(ctxReg, {
+                type: 'doughnut',
+                data: {
+                    labels: regData.map(r => r.region),
+                    datasets: [{
+                        data: regData.map(r => r.prod),
+                        backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#64748b']
+                    }]
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } }
+                }
+            });
+        }
+
+        function renderRainfallAnalysis() {
+            const pairs = filteredRecords.filter(r => r.rainfall_mm != null && r.calculated_yield > 0);
+            const n = pairs.length;
+            let rVal = 0, r2Val = 0;
+
+            if (n >= 3) {
+                const x = pairs.map(p => p.rainfall_mm);
+                const y = pairs.map(p => p.calculated_yield);
+                const meanX = x.reduce((a,b)=>a+b,0) / n;
+                const meanY = y.reduce((a,b)=>a+b,0) / n;
+                let num = 0, denX = 0, denY = 0;
+                for (let i = 0; i < n; i++) {
+                    const dx = x[i] - meanX;
+                    const dy = y[i] - meanY;
+                    num += dx * dy;
+                    denX += dx * dx;
+                    denY += dy * dy;
+                }
+                if (denX > 0 && denY > 0) {
+                    rVal = num / Math.sqrt(denX * denY);
+                    r2Val = rVal * rVal;
+                }
+            }
+
+            document.getElementById('corrR').innerText = `r = ${rVal.toFixed(3)}`;
+            document.getElementById('corrR2').innerText = `R² = ${r2Val.toFixed(3)}`;
+
+            const scatterPoints = pairs.map(p => ({ x: p.rainfall_mm, y: p.calculated_yield }));
+
+            if (chartInstances.scatter) chartInstances.scatter.destroy();
+            const ctx = document.getElementById('scatterChart').getContext('2d');
+            chartInstances.scatter = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'Observed Harvest Datapoints',
+                        data: scatterPoints,
+                        backgroundColor: '#059669',
+                        pointRadius: 4.5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: 'Rainfall (mm)' } },
+                        y: { title: { display: true, text: 'Calculated Yield (t/ha)' } }
+                    }
+                }
+            });
+        }
+
+        function renderMatrixTable() {
+            const metric = document.getElementById('matrixMetric').value;
+            const years = [...new Set(filteredRecords.map(r => r.year))].sort((a,b) => a - b);
+            const crops = [...new Set(filteredRecords.map(r => r.crop_name))].sort();
+
+            const thead = document.getElementById('matrixHead');
+            thead.innerHTML = `<tr><th class="py-2.5 px-3 bg-slate-200/80">Crop Name</th>` + years.map(y => `<th class="py-2.5 px-3 text-right">${y}</th>`).join('') + `</tr>`;
+
+            const tbody = document.getElementById('matrixBody');
+            if (crops.length === 0 || years.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="${years.length + 1}" class="py-4 text-center text-slate-400">No records match current filters</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = crops.map(c => {
+                const cells = years.map(y => {
+                    const matches = filteredRecords.filter(r => r.crop_name === c && r.year === y);
+                    if (matches.length === 0) return `<td class="py-2 px-3 text-right text-slate-300">-</td>`;
+                    const p = matches.reduce((s, r) => s + r.production, 0);
+                    const a = matches.reduce((s, r) => s + r.cultivated_area, 0);
+                    let val = "-";
+                    if (metric === 'production') val = Math.round(p).toLocaleString();
+                    else if (metric === 'area') val = Math.round(a).toLocaleString();
+                    else val = a > 0 ? (p / a).toFixed(2) : "0.00";
+                    return `<td class="py-2 px-3 text-right">${val}</td>`;
+                }).join('');
+                return `<tr class="hover:bg-slate-50 transition"><td class="py-2 px-3 font-semibold text-slate-800 bg-slate-50/50">${c}</td>${cells}</tr>`;
+            }).join('');
+        }
+
+        function renderRecordsTable() {
+            document.getElementById('recordRowCount').innerText = filteredRecords.length;
+            const tbody = document.getElementById('rawTableBody');
+
+            if (filteredRecords.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9" class="py-8 text-center text-slate-400 font-sans">No matching agricultural records found. Use the form above to add custom records or adjust filters.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = filteredRecords.slice(0, 50).map(r => `
+                <tr class="hover:bg-slate-50 transition">
+                    <td class="py-2 px-3 text-slate-400 text-[11px]">${r.record_id}</td>
+                    <td class="py-2 px-3 font-bold text-slate-800 font-sans">${r.crop_name}</td>
+                    <td class="py-2 px-3 font-sans">${r.region_name}</td>
+                    <td class="py-2 px-3">${r.year}</td>
+                    <td class="py-2 px-3 text-right">${r.cultivated_area.toLocaleString()}</td>
+                    <td class="py-2 px-3 text-right font-medium">${r.production.toLocaleString()}</td>
+                    <td class="py-2 px-3 text-right font-bold text-emerald-700">${r.calculated_yield}</td>
+                    <td class="py-2 px-3 text-right text-blue-600">${r.rainfall_mm != null ? r.rainfall_mm : '-'}</td>
+                    <td class="py-2 px-3 text-center whitespace-nowrap">
+                        <button onclick="openEditModal('${r.record_id}')" class="text-indigo-600 hover:text-indigo-800 p-1 font-sans text-xs underline font-medium">Edit</button>
+                        <button onclick="deleteRecord('${r.record_id}')" class="text-rose-600 hover:text-rose-800 p-1 font-sans text-xs underline font-medium ml-1">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Export Functionality
+        function downloadCSVExport() {
+            if (filteredRecords.length === 0) {
+                showToast("No active records to export.", "error");
+                return;
+            }
+            let csv = "record_id,crop_name,region_name,year,cultivated_area,production,calculated_yield,rainfall_mm\n";
+            filteredRecords.forEach(r => {
+                csv += `"${r.record_id}","${r.crop_name}","${r.region_name}",${r.year},${r.cultivated_area},${r.production},${r.calculated_yield},${r.rainfall_mm ?? ''}\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('href', url);
+            a.setAttribute('download', `agricrop_${currentMode}_export_${Date.now()}.csv`);
+            a.click();
+            showToast("Filtered CSV exported successfully.", "success");
+        }
+
+        function downloadSampleTemplate() {
+            const sample = `crop,region,year,area,production,rainfall\nWheat,Kansas Central,2024,45000,180000,680\nSoybeans,Iowa East,2024,52000,171600,820\nMaize,Illinois Valley,2024,65000,747500,890\nBarley,North Dakota,2024,31000,108500,540`;
+            const blob = new Blob([sample], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('href', url);
+            a.setAttribute('download', 'agricrop_sample_template.csv');
+            a.click();
+            showToast("Downloaded sample CSV format template.", "info");
+        }
+
+        function copySQLSchema() {
+            const sql = document.getElementById('sqlPreBlock').innerText;
+            const textarea = document.createElement('textarea');
+            textarea.value = sql;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            showToast("MySQL Schema copied to clipboard!", "success");
+        }
+
+        // Tabs Navigation
+        function switchTab(tabKey) {
+            const tabs = ['trends', 'reports', 'rainfall', 'matrix', 'records', 'schema'];
+            tabs.forEach(t => {
+                document.getElementById(`tab-content-${t}`).classList.add('hidden');
+                document.getElementById(`tab-btn-${t}`).classList.remove('tab-active');
+                document.getElementById(`tab-btn-${t}`).classList.add('text-slate-500');
+            });
+            document.getElementById(`tab-content-${tabKey}`).classList.remove('hidden');
+            document.getElementById(`tab-btn-${tabKey}`).classList.add('tab-active');
+            document.getElementById(`tab-btn-${tabKey}`).classList.remove('text-slate-500');
+
+            // Resize charts on reveal
+            if (tabKey === 'trends' && chartInstances.trends) chartInstances.trends.resize();
+            if (tabKey === 'reports') {
+                if (chartInstances.crop) chartInstances.crop.resize();
+                if (chartInstances.region) chartInstances.region.resize();
+            }
+            if (tabKey === 'rainfall' && chartInstances.scatter) chartInstances.scatter.resize();
+        }
+
+        // Clean Toast Notification System
+        function showToast(message, type = "info") {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            
+            let bg = "bg-slate-900 text-white";
+            let border = "border-slate-700";
+            let icon = "ℹ️";
+
+            if (type === "success") {
+                bg = "bg-emerald-900 text-emerald-100";
+                border = "border-emerald-600";
+                icon = "✅";
+            } else if (type === "error") {
+                bg = "bg-rose-900 text-rose-100";
+                border = "border-rose-600";
+                icon = "⚠️";
+            }
+
+            toast.className = `flex items-center gap-2 px-3.5 py-2.5 rounded-xl shadow-lg border text-xs font-medium pointer-events-auto transition transform duration-200 translate-y-2 opacity-0 ${bg} ${border}`;
+            toast.innerHTML = `<span>${icon}</span><span class="flex-1">${message}</span>`;
+            
+            container.appendChild(toast);
+            
+            // Animation in
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            });
+
+            // Removal
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => {
+                    if (toast.parentNode) toast.parentNode.removeChild(toast);
+                }, 200);
+            }, 3500);
+        }
+
+        // Initialize application on window load
+        window.addEventListener('DOMContentLoaded', () => {
+            initializeApp();
+        });
+    </script>
+</body>
+</html>
